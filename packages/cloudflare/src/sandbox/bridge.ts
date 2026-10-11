@@ -1788,10 +1788,11 @@ export class PluginBridge extends WorkerEntrypoint<PluginBridgeEnv, PluginBridge
 
 	async httpFetch(url: string, init?: RequestInit): Promise<PluginHttpResponseWire> {
 		const { capabilities, allowedHosts, httpFetchKey } = this.ctx.props;
-		const fetchImpl = httpFetchKey ? httpFetchCallbacks.get(httpFetchKey) : undefined;
+		let fetchImpl = httpFetchKey ? httpFetchCallbacks.get(httpFetchKey) : undefined;
 		if (httpFetchKey && !fetchImpl) {
 			throw new Error("Plugin HTTP transport is unavailable");
 		}
+		fetchImpl ??= serviceRouteFetch(this.env as unknown as Record<string, unknown>);
 		return sandboxHttpFetch(url, init, { capabilities, allowedHosts, fetchImpl });
 	}
 
@@ -1988,4 +1989,48 @@ export class PluginBridge extends WorkerEntrypoint<PluginBridgeEnv, PluginBridge
 			this.secretRedactor.redact(data ?? ""),
 		);
 	}
+}
+
+/**
+ * Plugin requests to a Worker on the host's own zone, through a service
+ * binding instead of the public internet.
+ *
+ * A Worker's fetch() to a hostname on its own zone never reaches another
+ * Worker routed there, and with `global_fetch_strictly_public` it meets the
+ * zone's bot and WAF rules like a stranger. When the host sets
+ * `EMDASH_PLUGIN_SERVICE_ROUTES` to a JSON object mapping a URL prefix
+ * (hostname and path, no scheme) to the name of a service binding, a plugin
+ * request whose URL starts with that prefix goes to the binding. Everything
+ * else still goes out with the platform fetch. The plugin's capability and
+ * `allowedHosts` checks run first, as for any request (sandboxHttpFetch), so
+ * this only changes how an already-permitted request travels.
+ *
+ *   EMDASH_PLUGIN_SERVICE_ROUTES = '{"example.com/api/": "API"}'
+ */
+export function serviceRouteFetch(env: Record<string, unknown>): typeof fetch | undefined {
+	const raw = env.EMDASH_PLUGIN_SERVICE_ROUTES;
+	if (typeof raw !== "string" || raw.trim() === "") return undefined;
+	let routes: Array<[string, { fetch: typeof fetch }]>;
+	try {
+		const parsed = JSON.parse(raw) as Record<string, string>;
+		routes = Object.entries(parsed).flatMap(([prefix, name]) => {
+			const binding = env[name] as { fetch?: unknown } | undefined;
+			return binding && typeof binding.fetch === "function"
+				? [[prefix, binding as { fetch: typeof fetch }] as [string, { fetch: typeof fetch }]]
+				: [];
+		});
+	} catch {
+		console.warn("[plugin-bridge] EMDASH_PLUGIN_SERVICE_ROUTES isn't valid JSON; plugin requests use fetch");
+		return undefined;
+	}
+	if (routes.length === 0) return undefined;
+	const impl = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+		const u = new URL(input instanceof Request ? input.url : String(input));
+		const target = u.host + u.pathname;
+		for (const [prefix, binding] of routes) {
+			if (target.startsWith(prefix)) return binding.fetch(new Request(u, init));
+		}
+		return globalThis.fetch(input, init);
+	};
+	return impl as typeof fetch;
 }
