@@ -14,6 +14,7 @@ import type { APIContext } from "astro";
 import { describe, expect, it } from "vitest";
 
 import { GET as getManifest } from "../../../src/astro/routes/api/manifest.js";
+import { MediaRepository } from "../../../src/database/repositories/media.js";
 import { OptionsRepository } from "../../../src/database/repositories/options.js";
 import { setupTestDatabase, teardownTestDatabase } from "../../utils/test-db.js";
 
@@ -121,6 +122,104 @@ describe("manifest route admin branding", () => {
 		} finally {
 			await teardownTestDatabase(db);
 		}
+	});
+
+	describe("logo from site settings", () => {
+		function contextWith(db: unknown, admin: Record<string, unknown>) {
+			return {
+				locals: {
+					emdash: {
+						db,
+						config: { admin },
+						getManifest: async () => ({
+							version: "test",
+							hash: "test",
+							collections: {},
+							plugins: {},
+							taxonomies: [],
+						}),
+					},
+				},
+			} as unknown as APIContext;
+		}
+
+		it("uses the Settings logo when no admin.logo is configured", async () => {
+			const db = await setupTestDatabase();
+			try {
+				const media = await new MediaRepository(db).create({
+					filename: "logo.svg",
+					mimeType: "image/svg+xml",
+					storageKey: "site-logo.svg",
+				});
+				await new OptionsRepository(db).set("site:logo", { mediaId: media.id });
+
+				const response = await getManifest(contextWith(db, {}));
+				const body = (await response.json()) as ManifestEnvelope;
+				expect(body.data.admin?.logo).toBe("/_emdash/api/media/file/site-logo.svg");
+			} finally {
+				await teardownTestDatabase(db);
+			}
+		});
+
+		it("keeps an explicit admin.logo over the Settings logo", async () => {
+			const db = await setupTestDatabase();
+			try {
+				const media = await new MediaRepository(db).create({
+					filename: "logo.svg",
+					mimeType: "image/svg+xml",
+					storageKey: "site-logo.svg",
+				});
+				await new OptionsRepository(db).set("site:logo", { mediaId: media.id });
+
+				const response = await getManifest(contextWith(db, { logo: "/configured.svg" }));
+				const body = (await response.json()) as ManifestEnvelope;
+				expect(body.data.admin?.logo).toBe("/configured.svg");
+			} finally {
+				await teardownTestDatabase(db);
+			}
+		});
+
+		it("prefers the Settings logo over admin.defaultLogo", async () => {
+			const db = await setupTestDatabase();
+			try {
+				const media = await new MediaRepository(db).create({
+					filename: "logo.svg",
+					mimeType: "image/svg+xml",
+					storageKey: "site-logo.svg",
+				});
+				await new OptionsRepository(db).set("site:logo", { mediaId: media.id });
+
+				const response = await getManifest(contextWith(db, { defaultLogo: "/default.svg" }));
+				const body = (await response.json()) as ManifestEnvelope;
+				expect(body.data.admin?.logo).toBe("/_emdash/api/media/file/site-logo.svg");
+			} finally {
+				await teardownTestDatabase(db);
+			}
+		});
+
+		it("falls back to admin.defaultLogo when Settings has no logo", async () => {
+			const db = await setupTestDatabase();
+			try {
+				const response = await getManifest(
+					contextWith(db, { defaultLogo: "/default.svg", css: ":root{}" }),
+				);
+				const body = (await response.json()) as ManifestEnvelope;
+				expect(body.data.admin).toEqual({ logo: "/default.svg" });
+			} finally {
+				await teardownTestDatabase(db);
+			}
+		});
+
+		it("leaves the logo unset when Settings has no logo", async () => {
+			const db = await setupTestDatabase();
+			try {
+				const response = await getManifest(contextWith(db, {}));
+				const body = (await response.json()) as ManifestEnvelope;
+				expect(body.data.admin?.logo).toBeUndefined();
+			} finally {
+				await teardownTestDatabase(db);
+			}
+		});
 	});
 });
 

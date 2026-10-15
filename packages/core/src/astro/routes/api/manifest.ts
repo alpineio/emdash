@@ -12,6 +12,7 @@ import type { APIRoute } from "astro";
 import { apiSuccess, handleError } from "#api/error.js";
 import { getAuthMode } from "#auth/mode.js";
 import { OptionsRepository } from "#db/repositories/options.js";
+import { getSiteSettingWithDb } from "#settings/index.js";
 
 import { COMMIT, VERSION } from "../../../version.js";
 import type { EmDashManifest } from "../../types.js";
@@ -48,7 +49,9 @@ export const GET: APIRoute = async ({ locals }) => {
 		// doesn't assign it to globalThis, so getStoredConfig() always returned
 		// null and the React SPA never received custom logo/siteName/favicon.
 		// See issue #835.
-		let adminBranding = emdash?.config?.admin;
+		// `css` and `defaultLogo` are server-side inputs, not branding the SPA renders.
+		const { css: _css, defaultLogo, ...configBranding } = emdash?.config?.admin ?? {};
+		let adminBranding = emdash?.config?.admin ? configBranding : undefined;
 		let siteTimezone = "UTC";
 
 		// Read the site timezone alongside the title fallback so datetime controls
@@ -71,9 +74,20 @@ export const GET: APIRoute = async ({ locals }) => {
 				if (!adminBranding?.siteName && siteTitle) {
 					adminBranding = { ...adminBranding, siteName: siteTitle };
 				}
+				// Same precedence for the sidebar mark: explicit `admin.logo` →
+				// Logo from Settings → General → `admin.defaultLogo` → the bundled EmDash mark.
+				if (!adminBranding?.logo) {
+					const siteLogo = await getSiteSettingWithDb("logo", emdash.db, emdash.storage ?? null);
+					if (siteLogo?.url) {
+						adminBranding = { ...adminBranding, logo: siteLogo.url };
+					}
+				}
 			} catch {
 				// options table may not exist yet (pre-setup) — keep the default.
 			}
+		}
+		if (!adminBranding?.logo && defaultLogo) {
+			adminBranding = { ...adminBranding, logo: defaultLogo };
 		}
 
 		// Check if self-signup is enabled (any allowed domain with enabled = 1)

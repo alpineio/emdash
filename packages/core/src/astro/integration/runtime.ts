@@ -654,6 +654,16 @@ export interface EmDashConfig {
 		/** URL or path to a custom favicon for the admin panel. */
 		favicon?: string;
 		/**
+		 * Sidebar logo used when neither `logo` nor the Logo in Settings → General
+		 * is set. Unlike `logo`, it never hides the site's own logo.
+		 */
+		defaultLogo?: string;
+		/**
+		 * CSS added to the admin shell after the admin stylesheet, for theming
+		 * (e.g. overriding `--color-kumo-brand`).
+		 */
+		css?: string;
+		/**
 		 * Build-time allowlist of admin UI locales to ship.
 		 *
 		 * Only the listed locales are bundled and offered in the language
