@@ -1,0 +1,40 @@
+{
+	"name": "@alpineio/emdash-basics",
+	"version": "0.1.0",
+	"description": "Alpine's standard EmDash setup: default plugins, admin branding and theme, and the /__admin shortcut",
+	"type": "module",
+	"main": "src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"files": [
+		"src"
+	],
+	"scripts": {
+		"test": "vitest run",
+		"typecheck": "tsgo --noEmit"
+	},
+	"dependencies": {
+		"@emdash-cms/plugin-color": "workspace:*",
+		"@emdash-cms/plugin-embeds": "workspace:*",
+		"@emdash-cms/plugin-forms": "workspace:*"
+	},
+	"peerDependencies": {
+		"astro": "catalog:",
+		"emdash": "workspace:*"
+	},
+	"devDependencies": {
+		"astro": "catalog:",
+		"emdash": "workspace:*",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"registry": "https://npm.pkg.github.com"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alpineio/emdash.git",
+		"directory": "packages/alpine-basics"
+	},
+	"license": "MIT"
+}
