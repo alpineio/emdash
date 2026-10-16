@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Rebase the current branch onto upstream (default: upstream/main).
+# Rebase the current branch onto upstream. Arguments go to `git rebase`
+# (default: upstream/main), e.g. `--onto emdash@1.3.0 <base>` for a release.
 #
 # pnpm-lock.yaml conflicts on almost every upstream update, because Alpine's
 # packages add entries to it. When the lockfile is the only conflicted file,
@@ -11,9 +12,11 @@
 
 main() {
 	set -euo pipefail
-	local target="${1:-upstream/main}"
+	if [ $# -eq 0 ]; then
+		set -- upstream/main
+	fi
 
-	if git rebase "$target"; then
+	if git rebase "$@"; then
 		return 0
 	fi
 
