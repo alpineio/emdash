@@ -1,8 +1,8 @@
 # Builds Alpine's EmDash from an upstream release tag plus the Alpine commits
 # on mixcommand, tests it, and publishes @alpineio/emdash,
 # @alpineio/emdash-cloudflare and @alpineio/emdash-basics to GitHub Packages
-# as <upstream version>-alpine.<run number>. Without "publish" it stops after
-# packing and uploads the tarballs as an artifact.
+# (version scheme: scripts/alpine-release.mjs). Without "publish" it stops
+# after packing and uploads the tarballs as an artifact.
 name: Alpine release
 
 on:
@@ -51,6 +51,7 @@ jobs:
         id: base
         env:
           INPUT_TAG: ${{ inputs.upstream_tag }}
+          NODE_AUTH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -58,8 +59,8 @@ jobs:
           git fetch --quiet --tags upstream main
           tag="${INPUT_TAG:-$(git tag -l 'emdash@*' --sort=-v:refname | grep -E '^emdash@[0-9]+\.[0-9]+\.[0-9]+$' | head -1)}"
           git rev-parse --verify --quiet "refs/tags/$tag" > /dev/null || { echo "No tag $tag" >&2; exit 1; }
-          base_version="${tag#emdash@}"
-          version="$base_version-alpine.$GITHUB_RUN_NUMBER"
+          published=$(npm view @alpineio/emdash versions --json --registry https://npm.pkg.github.com 2>/dev/null || true)
+          version=$(node scripts/alpine-release.mjs next-version "${tag#emdash@}" "$published")
           bash scripts/alpine-rebase.sh --onto "$tag" "$(git merge-base HEAD upstream/main)"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -71,13 +72,18 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - run: pnpm install --frozen-lockfile
+
+      # Before the build: core bakes its version into dist/.
+      - name: Set version
+        run: node scripts/alpine-release.mjs set-version "${{ steps.base.outputs.version }}"
+
       - run: pnpm build
 
       - name: Test the packages being published
         run: pnpm --no-bail --filter emdash --filter @emdash-cms/cloudflare --filter @alpineio/emdash-basics test
 
       - name: Pack
-        run: node scripts/alpine-release.mjs "${{ steps.base.outputs.version }}" "$RUNNER_TEMP/tarballs"
+        run: node scripts/alpine-release.mjs pack "${{ steps.base.outputs.version }}" "$RUNNER_TEMP/tarballs"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

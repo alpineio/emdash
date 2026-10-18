@@ -9,6 +9,7 @@ import { ALPINE_LOGO } from "./logo.js";
 import { ALPINE_BLUE, alpineAdminCss } from "./theme.js";
 
 export { ALPINE_LOGO } from "./logo.js";
+export { adminShortcutTarget } from "./middleware.js";
 export { ALPINE_BLUE, alpineAdminCss } from "./theme.js";
 
 export interface AlpineEmdashConfig extends EmDashConfig {
@@ -43,20 +44,15 @@ export function alpineDefaultPlugins(): PluginEntry[] {
 	return [formsPlugin(), embedsPlugin(), colorPlugin()].map(resolvedFromHere);
 }
 
-/** /__admin and anything under it goes to the EmDash admin. */
-export const ADMIN_REDIRECTS: Record<string, string> = {
-	"/__admin": "/_emdash/admin/",
-	"/__admin/[...path]": "/_emdash/admin/[...path]",
-};
-
 const CSS_VALUE_BREAKOUT = /[;{}<>]/;
 
+/** Redirects /__admin and anything under it to the EmDash admin. */
 export function alpineAdminRedirects(): AstroIntegration {
 	return {
 		name: "@alpineio/emdash-basics/redirects",
 		hooks: {
-			"astro:config:setup": ({ updateConfig }) => {
-				updateConfig({ redirects: ADMIN_REDIRECTS });
+			"astro:config:setup": ({ addMiddleware }) => {
+				addMiddleware({ entrypoint: new URL("./middleware.ts", import.meta.url), order: "pre" });
 			},
 		},
 	};
@@ -97,7 +93,7 @@ export function resolveAlpineConfig(config: AlpineEmdashConfig = {}): EmDashConf
  * `integrations: [react(), alpineEmdash({ database, storage })]`
  */
 export function alpineEmdash(config: AlpineEmdashConfig = {}): AstroIntegration[] {
-	return [emdash(resolveAlpineConfig(config)), alpineAdminRedirects()];
+	return [alpineAdminRedirects(), emdash(resolveAlpineConfig(config))];
 }
 
 export default alpineEmdash;

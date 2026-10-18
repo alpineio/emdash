@@ -2,8 +2,8 @@ import { formsPlugin } from "@emdash-cms/plugin-forms";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-	ADMIN_REDIRECTS,
 	ALPINE_LOGO,
+	adminShortcutTarget,
 	alpineAdminRedirects,
 	alpineEmdash,
 	resolveAlpineConfig,
@@ -63,19 +63,44 @@ describe("resolveAlpineConfig", () => {
 	});
 });
 
+describe("adminShortcutTarget", () => {
+	it("sends /__admin and its subpaths to the EmDash admin", () => {
+		expect(adminShortcutTarget("/__admin")).toBe("/_emdash/admin/");
+		expect(adminShortcutTarget("/__admin/")).toBe("/_emdash/admin/");
+		expect(adminShortcutTarget("/__admin/content/posts", "?q=1")).toBe(
+			"/_emdash/admin/content/posts?q=1",
+		);
+	});
+
+	it("keeps the target on this site when the path starts with extra slashes", () => {
+		expect(adminShortcutTarget("/__admin//evil.example")).toBe("/_emdash/admin/evil.example");
+	});
+
+	it("leaves other paths alone", () => {
+		expect(adminShortcutTarget("/__administrator")).toBeUndefined();
+		expect(adminShortcutTarget("/_emdash/admin/")).toBeUndefined();
+		expect(adminShortcutTarget("/")).toBeUndefined();
+	});
+});
+
 describe("alpineAdminRedirects", () => {
-	it("redirects /__admin and its subpaths to the EmDash admin", async () => {
+	it("registers the shortcut as middleware, not Astro redirects", async () => {
+		const addMiddleware = vi.fn();
 		const updateConfig = vi.fn();
 		const hook = alpineAdminRedirects().hooks["astro:config:setup"];
-		await hook?.({ updateConfig } as never);
-		expect(updateConfig).toHaveBeenCalledWith({ redirects: ADMIN_REDIRECTS });
-		expect(ADMIN_REDIRECTS["/__admin"]).toBe("/_emdash/admin/");
+		await hook?.({ addMiddleware, updateConfig } as never);
+		expect(updateConfig).not.toHaveBeenCalled();
+		const [{ entrypoint, order }] = addMiddleware.mock.calls[0] as [
+			{ entrypoint: URL; order: string },
+		];
+		expect(entrypoint.pathname.endsWith("/src/middleware.ts")).toBe(true);
+		expect(order).toBe("pre");
 	});
 });
 
 describe("alpineEmdash", () => {
-	it("returns the EmDash integration followed by the redirects", () => {
+	it("returns the redirects and the EmDash integration", () => {
 		const names = alpineEmdash().map((integration) => integration.name);
-		expect(names).toEqual(["emdash", "@alpineio/emdash-basics/redirects"]);
+		expect(names).toEqual(["@alpineio/emdash-basics/redirects", "emdash"]);
 	});
 });
