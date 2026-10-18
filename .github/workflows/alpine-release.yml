@@ -71,12 +71,13 @@ jobs:
             git log --format='- %h %s' "$tag..HEAD"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - run: pnpm install --frozen-lockfile
-
-      # Before the build: core bakes its version into dist/.
+      # Before the build, because core bakes its version into dist/, and
+      # before the install, because pnpm refuses to run scripts in a workspace
+      # whose package.json files changed since the last install.
       - name: Set version
         run: node scripts/alpine-release.mjs set-version "${{ steps.base.outputs.version }}"
 
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
       - name: Test the packages being published

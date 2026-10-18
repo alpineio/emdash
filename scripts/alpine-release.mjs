@@ -11,8 +11,9 @@
  * 1000 × (upstream patch + 1) + build, so builds on emdash 1.3.0 are 1.3.1001,
  * 1.3.1002, … and never look like an upstream release.
  *
- * set-version runs before the build, because core bakes its package.json
- * version into dist/ (VERSION, and the adapter version check).
+ * set-version runs before `pnpm install` and the build: core bakes its
+ * package.json version into dist/ (VERSION, and the adapter version check),
+ * and pnpm won't run scripts after package.json files change post-install.
  *
  * pack renames the packages Alpine changes into the @alpineio scope and runs
  * `pnpm pack`, which turns workspace: and catalog: ranges into the versions
