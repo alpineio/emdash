@@ -71,6 +71,11 @@ describe("resolveAlpineConfig", () => {
 		expect(resolveAlpineConfig({ brandFonts: false }).fonts).toBeUndefined();
 	});
 
+	it("turns off EmDash's npm update banner unless the site turns it on", () => {
+		expect(resolveAlpineConfig().updateCheck).toBe(false);
+		expect(resolveAlpineConfig({ updateCheck: true }).updateCheck).toBe(true);
+	});
+
 	it("keeps a site's own EmDash fonts setting", () => {
 		expect(resolveAlpineConfig({ fonts: { scripts: ["arabic"] } }).fonts).toEqual({
 			scripts: ["arabic"],

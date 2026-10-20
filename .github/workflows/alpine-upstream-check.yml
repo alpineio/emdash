@@ -2,6 +2,10 @@
 # and passes the package tests. Opens (or updates) an issue labelled
 # upstream-sync when anything breaks, and closes it once a run passes again.
 # It never pushes: syncing the branches stays a manual step.
+#
+# The release job opens an upstream-release issue when emdash-cms has a
+# release tag newer than the one the latest @alpineio/emdash was built on.
+# Alpine sites turn off EmDash's own npm update banner, so this is their notice.
 name: Upstream sync check
 
 on:
@@ -12,6 +16,7 @@ on:
 permissions:
   contents: read
   issues: write
+  packages: read
 
 concurrency:
   group: upstream-sync-check
@@ -23,6 +28,55 @@ env:
   LABEL: upstream-sync
 
 jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ env.BRANCH }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22.16.0
+          registry-url: https://npm.pkg.github.com
+          scope: "@alpineio"
+
+      - name: Compare the newest upstream release with the latest Alpine build
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_LABEL: upstream-release
+        run: |
+          git remote add upstream "$UPSTREAM"
+          git fetch --quiet --tags upstream
+          tag=$(git tag -l 'emdash@*' --sort=-v:refname | grep -E '^emdash@[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          upstream="${tag#emdash@}"
+          published=$(npm view @alpineio/emdash versions --json --registry https://npm.pkg.github.com 2>/dev/null || true)
+          base=$(node scripts/alpine-release.mjs latest-base "$published")
+          if [ -z "$base" ]; then
+            echo "Could not read published @alpineio/emdash versions; skipping." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          newest=$(printf '%s\n%s\n' "$base" "$upstream" | sort -V | tail -1)
+          if [ "$newest" = "$base" ]; then
+            echo "Latest Alpine build is on emdash $base, the newest upstream release." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          title="emdash $upstream is out: run Alpine release"
+          if gh issue list --label "$RELEASE_LABEL" --state all --search "in:title \"$title\"" --json title --jq '.[].title' | grep -qxF "$title"; then
+            echo "Issue already exists: $title" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh label create "$RELEASE_LABEL" --color 1D76DB --description "Upstream EmDash release to build" --force
+          {
+            echo "Upstream released [emdash $upstream]($UPSTREAM/releases/tag/emdash%40$upstream). The latest @alpineio/emdash is built on $base."
+            echo
+            echo "To build on it: Actions → Alpine release → Run workflow, with Publish on. Then move each site to the new version, test first."
+          } > "$RUNNER_TEMP/issue.md"
+          gh issue create --title "$title" --label "$RELEASE_LABEL" --body-file "$RUNNER_TEMP/issue.md"
+          echo "Opened: $title" >> "$GITHUB_STEP_SUMMARY"
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 120

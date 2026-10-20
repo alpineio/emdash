@@ -126,6 +126,11 @@ export function resolveAlpineConfig(config: AlpineEmdashConfig = {}): EmDashConf
 	return {
 		// EmDash's Noto Sans would claim --font-emdash before alpineAdminFonts() could.
 		...(brandFonts ? { fonts: false as const } : {}),
+		// EmDash's banner compares against npm's emdash, which the Alpine version
+		// scheme hides (1.3.2 < 1.3.2003) and whose advice ("update the emdash
+		// package") is wrong for an Alpine build. The fork's weekly check opens
+		// an issue when an upstream release needs an Alpine release instead.
+		updateCheck: false,
 		...emdashConfig,
 		plugins,
 		admin: {

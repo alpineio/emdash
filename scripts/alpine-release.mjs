@@ -3,6 +3,7 @@
  * Release Alpine's builds of EmDash to GitHub Packages.
  *
  *   node scripts/alpine-release.mjs next-version <upstream-version> [published-json]
+ *   node scripts/alpine-release.mjs latest-base [published-json]
  *   node scripts/alpine-release.mjs set-version <version>
  *   node scripts/alpine-release.mjs pack <version> <out-dir>
  *
@@ -77,6 +78,25 @@ export function nextVersion(upstream, published = []) {
 	return `${major}.${minor}.${floor + build + 1}`;
 }
 
+function compareVersions(a, b) {
+	for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] - b[i];
+	return 0;
+}
+
+/** The newest upstream release any published Alpine version was built on, or undefined. */
+export function latestBase(published = []) {
+	let best;
+	for (const version of published) {
+		const match = PLAIN_VERSION.exec(version);
+		if (!match) continue;
+		const [major, minor, patch] = match.slice(1).map(Number);
+		if (patch < BUILDS_PER_UPSTREAM_PATCH) continue;
+		const base = [major, minor, Math.floor(patch / BUILDS_PER_UPSTREAM_PATCH) - 1];
+		if (!best || compareVersions(base, best) > 0) best = base;
+	}
+	return best?.join(".");
+}
+
 function editPackageJson(dir, edit) {
 	const file = resolve(dir, "package.json");
 	const text = readFileSync(file, "utf8");
@@ -142,13 +162,15 @@ function publishedVersions(json) {
 function main([command, ...args]) {
 	if (command === "next-version" && args[0]) {
 		console.log(nextVersion(args[0], publishedVersions(args[1])));
+	} else if (command === "latest-base") {
+		console.log(latestBase(publishedVersions(args[0])) ?? "");
 	} else if (command === "set-version" && args[0]) {
 		setVersion(args[0]);
 	} else if (command === "pack" && args[0] && args[1]) {
 		pack(args[0], args[1]);
 	} else {
 		console.error(
-			"usage: alpine-release.mjs next-version <upstream> [published-json] | set-version <version> | pack <version> <out-dir>",
+			"usage: alpine-release.mjs next-version <upstream> [published-json] | latest-base [published-json] | set-version <version> | pack <version> <out-dir>",
 		);
 		process.exit(1);
 	}
