@@ -44,6 +44,12 @@ describe("resolveAlpineConfig", () => {
 		expect(css.match(/--color-kumo-brand: var\(--alpine-accent\);/g)).toHaveLength(2);
 	});
 
+	it("gives light-mode buttons a darker blue so white text stays readable", () => {
+		const css = resolveAlpineConfig().admin?.css ?? "";
+		expect(css).toContain("--alpine-button: #2f6fbd;");
+		expect(css).toContain("--kumo-button-emphasis-bg: var(--alpine-button) !important;");
+	});
+
 	it("appends a site's own admin css after the theme", () => {
 		const css = resolveAlpineConfig({ admin: { css: ".x{color:red}" } }).admin?.css ?? "";
 		expect(css.endsWith(".x{color:red}")).toBe(true);

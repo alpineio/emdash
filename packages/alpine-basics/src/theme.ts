@@ -59,6 +59,8 @@ export function alpineAdminCss(brandColor: string = ALPINE_BLUE): string {
 	--alpine-rule: rgba(14, 20, 24, 0.13);
 	--alpine-grid: rgba(14, 20, 24, 0.045);
 	--alpine-accent: ${accent.light};
+	/* Darker than the accent so white button text reads at about 5:1. */
+	--alpine-button: ${accent.lightText};
 	--alpine-ok: #2c6e49;
 	--alpine-warn: #9a6b00;
 	--alpine-bad: #b3001b;
@@ -101,6 +103,7 @@ export function alpineAdminCss(brandColor: string = ALPINE_BLUE): string {
 	--alpine-rule: rgba(237, 234, 226, 0.15);
 	--alpine-grid: rgba(237, 234, 226, 0.05);
 	--alpine-accent: ${accent.dark};
+	--alpine-button: ${accent.dark};
 	--alpine-ok: #4faf7a;
 	--alpine-warn: #f2bb05;
 	--alpine-bad: #ff5a6e;
@@ -221,9 +224,9 @@ aside[data-sidebar="sidebar"] {
    selector; equal stops make it flat. */
 [data-kumo-component="Button"],
 [data-kumo-component="LinkButton"] {
-	--kumo-button-emphasis-bg: var(--alpine-accent) !important;
-	--kumo-button-emphasis-gradient-start: var(--alpine-accent) !important;
-	--kumo-button-emphasis-gradient-end: var(--alpine-accent) !important;
+	--kumo-button-emphasis-bg: var(--alpine-button) !important;
+	--kumo-button-emphasis-gradient-start: var(--alpine-button) !important;
+	--kumo-button-emphasis-gradient-end: var(--alpine-button) !important;
 }
 [data-kumo-component="Button"]:hover:not(:disabled),
 [data-kumo-component="LinkButton"]:hover {
@@ -234,6 +237,7 @@ aside[data-sidebar="sidebar"] {
 [data-kumo-component="Button"].bg-kumo-brand,
 [data-kumo-component="LinkButton"].bg-kumo-brand {
 	background-image: none;
+	background-color: var(--alpine-button);
 }
 /* White on the lighter dark-mode accent is about 2.5:1; dark paper is about
    7.5:1. Kumo forces white with a layered !important on the button, so the
