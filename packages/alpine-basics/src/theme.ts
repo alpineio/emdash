@@ -149,7 +149,10 @@ body .shadow-xs, body .shadow-sm, body .shadow, body .shadow-md, body .shadow-lg
 /* Labels: small monospace caps. */
 [data-sidebar="group-label"],
 #admin-root th,
-#admin-root label[for] {
+#admin-root label[for],
+#admin-root label.font-medium,
+#admin-root label.font-medium *,
+#admin-root .gap-1\\.5 > .justify-between > span.font-medium.text-kumo-default {
 	font-family: var(--alpine-mono);
 	font-size: 10px;
 	font-weight: 400;
@@ -167,15 +170,23 @@ body .shadow-xs, body .shadow-sm, body .shadow, body .shadow-md, body .shadow-lg
 	letter-spacing: inherit;
 	text-transform: inherit;
 }
-/* Card titles. No data hook here, so this follows the card's classes; if they
-   change, titles fall back to the body font. */
-#admin-root .ring-kumo-hairline > .bg-kumo-elevated > h2 {
+/* Card and editor-panel titles. No data hook here, so this follows their
+   classes; if they change, titles fall back to the body font. */
+#admin-root .ring-kumo-hairline > .bg-kumo-elevated > h2,
+#admin-root .p-4 > h3.font-semibold,
+#admin-root .p-4 > .mb-4 > h3.font-semibold {
 	font-family: var(--alpine-mono);
 	font-size: 11px;
 	font-weight: 400;
 	letter-spacing: 0.14em;
 	text-transform: uppercase;
 	color: var(--alpine-ink);
+}
+
+/* Text the admin already sets in caps (dividers such as "Or continue with"). */
+#admin-root .uppercase {
+	font-family: var(--alpine-mono);
+	letter-spacing: 0.12em;
 }
 
 /* Sidebar: surface panel, accent bar on the active item. */
@@ -223,6 +234,13 @@ aside[data-sidebar="sidebar"] {
 [data-kumo-component="Button"].bg-kumo-brand,
 [data-kumo-component="LinkButton"].bg-kumo-brand {
 	background-image: none;
+}
+/* White on the lighter dark-mode accent is about 2.5:1; dark paper is about
+   7.5:1. Kumo forces white with a layered !important on the button, so the
+   color goes on its content, which would otherwise inherit that white. */
+:root[data-mode="dark"] [data-kumo-component="Button"]:is(.bg-kumo-brand, [class*="kumo-button-emphasis-bg"]) > *,
+:root[data-mode="dark"] [data-kumo-component="LinkButton"]:is(.bg-kumo-brand, [class*="kumo-button-emphasis-bg"]) > * {
+	color: var(--alpine-paper);
 }
 [data-kumo-component="Button"].bg-kumo-brand:hover:not(:disabled),
 [data-kumo-component="LinkButton"].bg-kumo-brand:hover {
