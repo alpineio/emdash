@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
 	ALPINE_LOGO,
 	adminShortcutTarget,
+	alpineAdminFonts,
 	alpineAdminRedirects,
 	alpineEmdash,
 	resolveAlpineConfig,
@@ -38,13 +39,15 @@ describe("resolveAlpineConfig", () => {
 
 	it("themes the admin with the brand color in light and dark mode", () => {
 		const css = resolveAlpineConfig({ brandColor: "#e63946" }).admin?.css ?? "";
-		expect(css.match(/--color-kumo-brand: #e63946;/g)).toHaveLength(2);
+		expect(css).toContain("--alpine-accent: #e63946;");
+		expect(css).toContain("--alpine-accent: color-mix(in oklab, #e63946 80%, white);");
+		expect(css.match(/--color-kumo-brand: var\(--alpine-accent\);/g)).toHaveLength(2);
 	});
 
 	it("appends a site's own admin css after the theme", () => {
 		const css = resolveAlpineConfig({ admin: { css: ".x{color:red}" } }).admin?.css ?? "";
 		expect(css.endsWith(".x{color:red}")).toBe(true);
-		expect(css).toContain("--color-kumo-brand: #4a8fe1;");
+		expect(css).toContain("--alpine-accent: #4a8fe1;");
 	});
 
 	it("leaves the admin css unset when the theme is off and the site adds none", () => {
@@ -55,6 +58,17 @@ describe("resolveAlpineConfig", () => {
 		expect(() => resolveAlpineConfig({ brandColor: "red;}</style><script>" })).toThrow(
 			/single CSS color/,
 		);
+	});
+
+	it("turns off EmDash's Noto Sans so Inter Tight can take --font-emdash", () => {
+		expect(resolveAlpineConfig().fonts).toBe(false);
+		expect(resolveAlpineConfig({ brandFonts: false }).fonts).toBeUndefined();
+	});
+
+	it("keeps a site's own EmDash fonts setting", () => {
+		expect(resolveAlpineConfig({ fonts: { scripts: ["arabic"] } }).fonts).toEqual({
+			scripts: ["arabic"],
+		});
 	});
 
 	it("passes database and storage through untouched", () => {
@@ -98,9 +112,49 @@ describe("alpineAdminRedirects", () => {
 	});
 });
 
+describe("alpineAdminFonts", () => {
+	async function fontsAdded(existing: Array<{ cssVariable: string }>) {
+		const updateConfig = vi.fn();
+		const hook = alpineAdminFonts().hooks["astro:config:setup"];
+		await hook?.({ config: { fonts: existing }, updateConfig } as never);
+		const call = updateConfig.mock.calls[0] as
+			| [{ fonts: Array<{ name: string; cssVariable: string }> }]
+			| undefined;
+		return call?.[0].fonts.map((font) => `${font.name} ${font.cssVariable}`);
+	}
+
+	it("adds Inter Tight and JetBrains Mono for the admin", async () => {
+		expect(await fontsAdded([])).toEqual([
+			"Inter Tight --font-emdash",
+			"JetBrains Mono --font-emdash-mono",
+		]);
+	});
+
+	it("skips a font variable the site already defines", async () => {
+		expect(await fontsAdded([{ cssVariable: "--font-emdash" }])).toEqual([
+			"JetBrains Mono --font-emdash-mono",
+		]);
+	});
+
+	it("adds nothing when both are defined", async () => {
+		expect(
+			await fontsAdded([{ cssVariable: "--font-emdash" }, { cssVariable: "--font-emdash-mono" }]),
+		).toBeUndefined();
+	});
+});
+
 describe("alpineEmdash", () => {
-	it("returns the redirects and the EmDash integration", () => {
+	it("returns the redirects, EmDash, then the fonts", () => {
 		const names = alpineEmdash().map((integration) => integration.name);
+		expect(names).toEqual([
+			"@alpineio/emdash-basics/redirects",
+			"emdash",
+			"@alpineio/emdash-basics/fonts",
+		]);
+	});
+
+	it("leaves the fonts out when brandFonts is false", () => {
+		const names = alpineEmdash({ brandFonts: false }).map((integration) => integration.name);
 		expect(names).toEqual(["@alpineio/emdash-basics/redirects", "emdash"]);
 	});
 });

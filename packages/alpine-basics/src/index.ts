@@ -1,8 +1,10 @@
+import { createRequire } from "node:module";
+
 import { colorPlugin } from "@emdash-cms/plugin-color";
 import { embedsPlugin } from "@emdash-cms/plugin-embeds";
 import { formsPlugin } from "@emdash-cms/plugin-forms";
-import { createRequire } from "node:module";
 import type { AstroIntegration } from "astro";
+import { fontProviders } from "astro/config";
 import emdash, { type EmDashConfig } from "emdash/astro";
 
 import { ALPINE_LOGO } from "./logo.js";
@@ -17,6 +19,8 @@ export interface AlpineEmdashConfig extends EmDashConfig {
 	brandColor?: string;
 	/** Set to false to keep EmDash's own admin colors. */
 	theme?: boolean;
+	/** Set to false to keep EmDash's own admin font (Noto Sans) instead of Inter Tight and JetBrains Mono. */
+	brandFonts?: boolean;
 }
 
 type PluginEntry = NonNullable<EmDashConfig["plugins"]>[number];
@@ -46,6 +50,49 @@ export function alpineDefaultPlugins(): PluginEntry[] {
 
 const CSS_VALUE_BREAKOUT = /[;{}<>]/;
 
+/** The admin's fonts, self-hosted by Astro: the admin's CSP allows no font CDN. */
+export const ADMIN_FONTS = [
+	{
+		name: "Inter Tight",
+		cssVariable: "--font-emdash",
+		weights: [400, 500, 600, 700],
+		fallbacks: ["Inter", "system-ui", "sans-serif"],
+	},
+	{
+		name: "JetBrains Mono",
+		cssVariable: "--font-emdash-mono",
+		weights: [400, 500],
+		fallbacks: ["ui-monospace", "monospace"],
+	},
+] as const;
+
+/**
+ * Adds Inter Tight and JetBrains Mono for the admin, skipping any font
+ * variable the site or EmDash already defines. Goes after emdash() in the
+ * integrations, so EmDash's own font entry is already in the config.
+ */
+export function alpineAdminFonts(): AstroIntegration {
+	return {
+		name: "@alpineio/emdash-basics/fonts",
+		hooks: {
+			"astro:config:setup": ({ config, updateConfig }) => {
+				const taken = new Set(
+					((config as { fonts?: Array<{ cssVariable: string }> }).fonts ?? []).map(
+						(font) => font.cssVariable,
+					),
+				);
+				const fonts = ADMIN_FONTS.filter((font) => !taken.has(font.cssVariable)).map((font) => ({
+					...font,
+					weights: [...font.weights],
+					fallbacks: [...font.fallbacks],
+					provider: fontProviders.google(),
+				}));
+				if (fonts.length > 0) updateConfig({ fonts });
+			},
+		},
+	};
+}
+
 /** Redirects /__admin and anything under it to the EmDash admin. */
 export function alpineAdminRedirects(): AstroIntegration {
 	return {
@@ -60,7 +107,7 @@ export function alpineAdminRedirects(): AstroIntegration {
 
 /** The EmDash config an Alpine site ends up with, before it reaches `emdash()`. */
 export function resolveAlpineConfig(config: AlpineEmdashConfig = {}): EmDashConfig {
-	const { brandColor = ALPINE_BLUE, theme = true, ...emdashConfig } = config;
+	const { brandColor = ALPINE_BLUE, theme = true, brandFonts = true, ...emdashConfig } = config;
 	if (CSS_VALUE_BREAKOUT.test(brandColor)) {
 		throw new Error(`alpineEmdash: brandColor must be a single CSS color, got "${brandColor}"`);
 	}
@@ -77,6 +124,8 @@ export function resolveAlpineConfig(config: AlpineEmdashConfig = {}): EmDashConf
 		.join("\n");
 
 	return {
+		// EmDash's Noto Sans would claim --font-emdash before alpineAdminFonts() could.
+		...(brandFonts ? { fonts: false as const } : {}),
 		...emdashConfig,
 		plugins,
 		admin: {
@@ -93,7 +142,8 @@ export function resolveAlpineConfig(config: AlpineEmdashConfig = {}): EmDashConf
  * `integrations: [react(), alpineEmdash({ database, storage })]`
  */
 export function alpineEmdash(config: AlpineEmdashConfig = {}): AstroIntegration[] {
-	return [alpineAdminRedirects(), emdash(resolveAlpineConfig(config))];
+	const integrations = [alpineAdminRedirects(), emdash(resolveAlpineConfig(config))];
+	return config.brandFonts === false ? integrations : [...integrations, alpineAdminFonts()];
 }
 
 export default alpineEmdash;
