@@ -88,6 +88,11 @@ const faviconType = adminConfig?.favicon ? undefined : siteFaviconType;
 		<link rel="stylesheet" href={adminStylesUrl} />
 		{adminConfig?.css ? <style is:inline set:html={adminConfig.css} /> : null}
 		{componentDataByCssVariable.has("--font-emdash") ? <Font cssVariable="--font-emdash" /> : null}
+		{
+			componentDataByCssVariable.has("--font-emdash-mono") ? (
+				<Font cssVariable="--font-emdash-mono" />
+			) : null
+		}
 		{favicon ? (
 			<link rel="icon" href={favicon} type={faviconType} />
 		) : (
