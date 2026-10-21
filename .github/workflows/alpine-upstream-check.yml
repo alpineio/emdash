@@ -23,6 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Pins every gh command to this fork. Without it gh picks the "upstream"
+  # remote the jobs add, and would file issues on emdash-cms/emdash.
+  GH_REPO: ${{ github.repository }}
   BRANCH: mixcommand
   UPSTREAM: https://github.com/emdash-cms/emdash
   LABEL: upstream-sync
