@@ -129,7 +129,12 @@ jobs:
         id: test
         run: |
           set -o pipefail
-          pnpm --no-bail run --filter './packages/*' test 2>&1 | tee "$RUNNER_TEMP/test.log"
+          status=0
+          pnpm --no-bail run --filter './packages/*' --filter '!@emdash-cms/admin' test 2>&1 | tee "$RUNNER_TEMP/test.log" || status=1
+          # The admin's browser tests lose their test iframe when they share the
+          # runner with the other suites, so they run on their own, as in upstream CI.
+          pnpm run --filter @emdash-cms/admin test 2>&1 | tee -a "$RUNNER_TEMP/test.log" || status=1
+          exit $status
 
       - name: Report failure
         if: failure()
