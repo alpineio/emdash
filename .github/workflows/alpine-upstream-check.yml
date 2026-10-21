@@ -152,7 +152,7 @@ jobs:
   # iframe each week.
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -195,7 +195,14 @@ jobs:
         id: test
         run: |
           set -o pipefail
-          pnpm run --filter @emdash-cms/admin test 2>&1 | tee "$RUNNER_TEMP/test.log"
+          # In this job the admin suite fails about every other run with a test-runner
+          # error (lost test iframe, a mocker error, an unhandled rejection), never
+          # the same file twice, while it passes locally and in upstream CI. One
+          # retry keeps those from opening issues; a real breakage fails both.
+          if ! pnpm run --filter @emdash-cms/admin test 2>&1 | tee "$RUNNER_TEMP/test.log"; then
+            echo "::warning::Admin browser tests failed; retrying once."
+            pnpm run --filter @emdash-cms/admin test 2>&1 | tee "$RUNNER_TEMP/test.log"
+          fi
 
       - name: Report failure
         if: failure()
